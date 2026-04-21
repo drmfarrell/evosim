@@ -1,0 +1,50 @@
+{
+  "name": "evosim",
+  "version": "0.1.0",
+  "description": "Interactive 3D evolution simulator for undergraduate biology, aligned to Campbell Biology Unit 4",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build:wasm": "cd src/engine && wasm-pack build --target web --out-dir ../../src/wasm-pkg",
+    "build": "npm run build:wasm && vite build",
+    "preview": "vite preview",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "test:rust": "cd src/engine && cargo test",
+    "test:e2e": "playwright test",
+    "test": "npm run test:unit && npm run test:rust && npm run test:e2e",
+    "lint:mainline": "node scripts/check-main-ts-size.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/drmfarrell/evosim.git"
+  },
+  "keywords": [
+    "evolution",
+    "biology",
+    "simulation",
+    "education",
+    "mendelian",
+    "population-genetics",
+    "campbell-biology",
+    "WebXR",
+    "WASM"
+  ],
+  "author": "Dr. Fountain Farrell",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/drmfarrell/evosim/issues"
+  },
+  "homepage": "https://github.com/drmfarrell/evosim#readme",
+  "dependencies": {
+    "three": "^0.183.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "@types/three": "^0.183.1",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.8",
+    "vite-plugin-wasm": "^3.6.0",
+    "vitest": "^4.1.4"
+  }
+}

@@ -1,0 +1,25 @@
+node_modules/
+dist/
+src/wasm-pkg/
+src/engine/target/
+src/engine/Cargo.lock
+.vite/
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# Env
+.env
+.env.local

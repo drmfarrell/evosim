@@ -1,0 +1,207 @@
+{
+  "name": "generic_fish",
+  "sex_determination": "XY",
+  "autosomes": [
+    {
+      "name": "chr1",
+      "length_cm": 100.0,
+      "loci": [
+        {
+          "name": "BodyColor",
+          "position_cm": 20.0,
+          "alleles": ["B", "b"],
+          "dominance": "complete",
+          "dominant_allele": 0,
+          "phenotype_channel": "body_color_hue"
+        },
+        {
+          "name": "CoatPattern",
+          "position_cm": 55.0,
+          "alleles": ["P", "p"],
+          "dominance": "codominant",
+          "phenotype_channel": "coat_pattern"
+        },
+        {
+          "name": "Metabolism",
+          "position_cm": 85.0,
+          "alleles": ["M", "m"],
+          "dominance": "codominant",
+          "phenotype_channel": "metabolic_rate"
+        }
+      ]
+    },
+    {
+      "name": "chr2",
+      "length_cm": 100.0,
+      "loci": [
+        {
+          "name": "Size1",
+          "position_cm": 15.0,
+          "alleles": ["S", "s"],
+          "dominance": "additive",
+          "phenotype_channel": "body_size"
+        },
+        {
+          "name": "Size2",
+          "position_cm": 50.0,
+          "alleles": ["T", "t"],
+          "dominance": "additive",
+          "phenotype_channel": "body_size"
+        },
+        {
+          "name": "BodyShape",
+          "position_cm": 80.0,
+          "alleles": ["F", "f"],
+          "dominance": "incomplete",
+          "phenotype_channel": "body_shape_streamlined"
+        }
+      ]
+    },
+    {
+      "name": "chr3",
+      "length_cm": 80.0,
+      "loci": [
+        {
+          "name": "DorsalFin",
+          "position_cm": 20.0,
+          "alleles": ["D", "d"],
+          "dominance": "complete",
+          "dominant_allele": 0,
+          "phenotype_channel": "dorsal_fin_size"
+        },
+        {
+          "name": "MatingDisplay",
+          "position_cm": 50.0,
+          "alleles": ["Y", "y"],
+          "dominance": "complete",
+          "dominant_allele": 0,
+          "phenotype_channel": "mating_display_intensity"
+        },
+        {
+          "name": "CombatSpine",
+          "position_cm": 70.0,
+          "alleles": ["C", "c"],
+          "dominance": "complete",
+          "dominant_allele": 0,
+          "phenotype_channel": "combat_weapon"
+        }
+      ]
+    }
+  ],
+  "sex_chromosome": {
+    "larger_name": "X",
+    "smaller_name": "Y",
+    "larger_length_cm": 80.0,
+    "smaller_length_cm": 10.0,
+    "larger_loci": [
+      {
+        "name": "EyeColor",
+        "position_cm": 30.0,
+        "alleles": ["E", "e"],
+        "dominance": "complete",
+        "dominant_allele": 0,
+        "phenotype_channel": "eye_color"
+      }
+    ],
+    "smaller_loci": []
+  },
+  "phenotype_channels": [
+    {"name": "body_color_hue", "jitter_sigma": 0.02, "clamp_range": [0.0, 1.0]},
+    {"name": "body_size", "jitter_sigma": 0.03, "clamp_range": [0.6, 1.5]},
+    {"name": "body_shape_streamlined", "jitter_sigma": 0.02, "clamp_range": [0.0, 1.0]},
+    {"name": "dorsal_fin_size", "jitter_sigma": 0.02, "clamp_range": [0.0, 1.0]},
+    {"name": "coat_pattern", "jitter_sigma": 0.0, "clamp_range": [0.0, 1.0]},
+    {"name": "metabolic_rate", "jitter_sigma": 0.03, "clamp_range": [0.2, 1.2]},
+    {"name": "mating_display_intensity", "jitter_sigma": 0.03, "clamp_range": [0.0, 1.0]},
+    {"name": "eye_color", "jitter_sigma": 0.01, "clamp_range": [0.0, 1.0]},
+    {"name": "combat_weapon", "jitter_sigma": 0.0, "clamp_range": [0.0, 1.0]}
+  ],
+  "phenotype_mappings": {
+    "BodyColor": {
+      "type": "lookup",
+      "values_by_genotype": {"BB": 0.18, "Bb": 0.18, "bb": 0.82}
+    },
+    "CoatPattern": {
+      "type": "lookup",
+      "values_by_genotype": {"PP": 0.1, "Pp": 0.5, "pp": 0.9}
+    },
+    "Metabolism": {
+      "type": "lookup",
+      "values_by_genotype": {"MM": 0.9, "Mm": 0.6, "mm": 0.3}
+    },
+    "Size1": {
+      "type": "additive",
+      "contribution_by_allele": {"S": 0.25, "s": 0.1}
+    },
+    "Size2": {
+      "type": "additive",
+      "contribution_by_allele": {"T": 0.25, "t": 0.1}
+    },
+    "BodyShape": {
+      "type": "lookup",
+      "values_by_genotype": {"FF": 0.9, "Ff": 0.5, "ff": 0.1}
+    },
+    "DorsalFin": {
+      "type": "lookup",
+      "values_by_genotype": {"DD": 0.85, "Dd": 0.85, "dd": 0.15}
+    },
+    "MatingDisplay": {
+      "type": "lookup",
+      "values_by_genotype": {"YY": 0.9, "Yy": 0.9, "yy": 0.1}
+    },
+    "CombatSpine": {
+      "type": "lookup",
+      "values_by_genotype": {"CC": 0.9, "Cc": 0.9, "cc": 0.0}
+    },
+    "EyeColor": {
+      "type": "lookup",
+      "values_by_genotype": {
+        "EE": 0.15,
+        "Ee": 0.15,
+        "ee": 0.85,
+        "E_": 0.15,
+        "e_": 0.85
+      }
+    }
+  },
+  "fitness_regimes": {
+    "neutral": {"type": "neutral"},
+    "directional_dark": {
+      "type": "linear",
+      "channel": "body_color_hue",
+      "weight": 1.2,
+      "target": 0.9
+    },
+    "directional_light": {
+      "type": "linear",
+      "channel": "body_color_hue",
+      "weight": 1.2,
+      "target": 0.1
+    },
+    "stabilizing_size_medium": {
+      "type": "gaussian",
+      "channel": "body_size",
+      "weight": 1.0,
+      "optimum": 0.7,
+      "sigma": 0.15
+    },
+    "disruptive_size": {
+      "type": "disruptive",
+      "channel": "body_size",
+      "weight": 1.0,
+      "center": 0.7,
+      "sigma": 0.2
+    },
+    "heterozygote_advantage_metabolism": {
+      "type": "overdominant",
+      "locus": "Metabolism",
+      "homozygote_cost_aa": 0.25,
+      "homozygote_cost_bb": 0.25
+    },
+    "frequency_dependent_coat": {
+      "type": "frequency_dependent",
+      "channel": "coat_pattern",
+      "strength": 0.6
+    }
+  }
+}
