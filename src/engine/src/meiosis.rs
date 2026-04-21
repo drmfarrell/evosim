@@ -357,8 +357,11 @@ mod tests {
 
     #[test]
     fn unlinked_loci_assort_independently() {
-        // Loci on the same chromosome but 100 cM apart should produce
-        // ~50% recombinants (Haldane's function asymptotes at 0.5).
+        // Loci 100 cM apart under Haldane's mapping function give
+        // r = 0.5 * (1 - exp(-2m)) where m = Morgans = 1.0.
+        // Expected r = 0.5 * (1 - e^-2) ≈ 0.432. The limit 0.5 is only
+        // reached at infinite map distance. We check ~0.43 with finite
+        // tolerance.
         let mut arc = simple_archetype();
         arc.autosomes[0].length_cm = 100.0;
         arc.autosomes[0].loci[0].position_cm = 0.0;
@@ -368,7 +371,7 @@ mod tests {
         let mut rng = Pcg32::new(3);
 
         let mut recomb = 0usize;
-        let n = 50_000;
+        let n = 20_000;
         for _ in 0..n {
             let g = meiose(&parent, &arc, MeiosisParams::default(), &mut rng);
             let chr = &g.autosomes[0];
@@ -377,9 +380,13 @@ mod tests {
             }
         }
         let freq = recomb as f64 / n as f64;
-        // Should be near 0.5; tolerance wide because Poisson-uniform
-        // crossover converges to 0.5 asymptotically.
-        assert!((freq - 0.5).abs() < 0.05, "freq was {}", freq);
+        let expected = 0.5 * (1.0 - (-2.0_f64).exp());
+        assert!(
+            (freq - expected).abs() < 0.03,
+            "freq was {}, expected ~{}",
+            freq,
+            expected
+        );
     }
 
     #[test]

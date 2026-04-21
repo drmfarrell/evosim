@@ -83,6 +83,7 @@ impl Pcg32 {
     }
 
     /// Gaussian-distributed f64 via Box-Muller.
+    #[allow(dead_code)]
     pub fn normal(&mut self, mean: f64, sigma: f64) -> f64 {
         let u1 = self.next_f64().max(f64::MIN_POSITIVE);
         let u2 = self.next_f64();

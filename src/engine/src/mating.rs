@@ -6,6 +6,7 @@ use crate::creature::Creature;
 use crate::rng::Pcg32;
 
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 pub enum MatingScheme {
     Random,
     /// Assortative on a phenotype channel (exact-value weighted).

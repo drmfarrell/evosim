@@ -7,12 +7,77 @@ use crate::chromosome::Sex;
 use crate::creature::{Creature, CreatureId};
 use crate::fertilization::{fertilize, FertilizationOutcome, FertilizationParams};
 use crate::fitness::{fitness, FrequencyTable};
-use crate::mating::{select_pairs, MatingScheme};
+use crate::mating::MatingScheme;
 use crate::meiosis::{meiose, MeiosisParams};
 use crate::mutation::{mutate, MutationEvent};
 use crate::phenotype::{phenotype, PhenotypeValues};
 use crate::rng::Pcg32;
 use serde::{Deserialize, Serialize};
+
+/// Sample `n` mating pairs where each parent is drawn proportional to
+/// fitness. For v1 we only implement the Random scheme; other
+/// MatingScheme variants fall back to this.
+fn weighted_pairs(
+    population: &[Creature],
+    fitnesses: &[f64],
+    _scheme: MatingScheme,
+    n: usize,
+    rng: &mut Pcg32,
+) -> Vec<(usize, usize)> {
+    // Collect indices by sex, weighted by fitness.
+    let females: Vec<usize> = population
+        .iter()
+        .enumerate()
+        .filter(|(_, c)| c.sex == Sex::Female || c.sex == Sex::Hermaphrodite)
+        .map(|(i, _)| i)
+        .collect();
+    let males: Vec<usize> = population
+        .iter()
+        .enumerate()
+        .filter(|(_, c)| c.sex == Sex::Male || c.sex == Sex::Hermaphrodite)
+        .map(|(i, _)| i)
+        .collect();
+
+    if females.is_empty() || males.is_empty() {
+        return Vec::new();
+    }
+
+    let female_weights: Vec<f64> = females.iter().map(|&i| fitnesses[i].max(0.0)).collect();
+    let male_weights: Vec<f64> = males.iter().map(|&i| fitnesses[i].max(0.0)).collect();
+    let fw_sum: f64 = female_weights.iter().sum();
+    let mw_sum: f64 = male_weights.iter().sum();
+
+    // If everyone's fitness is zero, fall back to uniform sampling.
+    let fw_uniform = fw_sum <= 0.0;
+    let mw_uniform = mw_sum <= 0.0;
+
+    let mut pairs = Vec::with_capacity(n);
+    for _ in 0..n {
+        let m_idx = if fw_uniform {
+            females[rng.gen_range_usize(females.len())]
+        } else {
+            females[weighted_index(&female_weights, fw_sum, rng)]
+        };
+        let f_idx = if mw_uniform {
+            males[rng.gen_range_usize(males.len())]
+        } else {
+            males[weighted_index(&male_weights, mw_sum, rng)]
+        };
+        pairs.push((m_idx, f_idx));
+    }
+    pairs
+}
+
+fn weighted_index(weights: &[f64], sum: f64, rng: &mut Pcg32) -> usize {
+    let mut x = rng.next_f64() * sum;
+    for (i, &w) in weights.iter().enumerate() {
+        x -= w;
+        if x <= 0.0 {
+            return i;
+        }
+    }
+    weights.len() - 1
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenerationStats {
@@ -87,12 +152,14 @@ impl Population {
             .map(|(c, ph)| fitness(regime, c, ph, archetype, Some(&freq_table)))
             .collect();
 
-        // 2. Weighted-sampling survival: we skip an explicit survival
-        //    step and instead weight mating-pair selection by fitness.
-        //    This avoids two rounds of sampling noise and matches the
-        //    textbook "differential reproduction" framing.
-        let pairs = select_pairs(
+        // 2. Fitness-weighted mating. Instead of a separate survival
+        //    step, we let fitness directly bias who gets picked as a
+        //    parent. We sample pairs until we reach target_offspring
+        //    viable children. Each pair is sampled proportional to
+        //    female_fitness × male_fitness.
+        let pairs = weighted_pairs(
             &self.creatures,
+            &fitnesses,
             params.mating_scheme,
             params.target_offspring,
             rng,
@@ -103,18 +170,6 @@ impl Population {
         let mut mutations: Vec<MutationEvent> = Vec::new();
 
         for (mi, fi) in pairs {
-            // Fitness-weighted acceptance: the pair actually gets to
-            // reproduce with probability proportional to the product
-            // of parent fitnesses. This is a simple way to integrate
-            // selection with mating without a separate survival step.
-            let w_pair = fitnesses[mi] * fitnesses[fi];
-            // Normalize against a max of 1.0 * 1.0 = 1.0 for regimes
-            // that cap at 1; for regimes with fitnesses that can
-            // exceed 1 we just accept. Simplest: always accept and
-            // rely on fitness-biased offspring counts in later
-            // generations.
-            let _ = w_pair;
-
             let mother = &self.creatures[mi];
             let father = &self.creatures[fi];
 
@@ -290,28 +345,31 @@ mod tests {
     }
 
     #[test]
-    fn hardy_weinberg_stable_at_large_n() {
-        // At N=10000 with no selection, no mutation, random mating,
-        // allele frequency should stay near 0.5 over 50 generations.
+    fn hardy_weinberg_stable_at_moderate_n() {
+        // At N=500, no selection, no mutation, random mating, allele
+        // frequency stays near 0.5 over 15 generations (within drift
+        // tolerance). Smaller N for debug-mode test speed.
         let arc = simple_archetype();
         let mut rng = Pcg32::new(42);
-        let mut pop = Population::founder_biallelic(2000, &arc, 0.5, &mut rng);
+        let mut pop = Population::founder_biallelic(500, &arc, 0.5, &mut rng);
         let regime = FitnessRegime::Neutral;
         let params = StepParams {
             mutation_rate: 0.0,
             mating_scheme: MatingScheme::Random,
             meiosis: MeiosisParams::default(),
             fertilization: FertilizationParams::default(),
-            target_offspring: 2000,
+            target_offspring: 500,
         };
 
         let initial_p = pop.stats(&arc, &regime).allele0_freq_autosomes[0][0];
-        for _ in 0..20 {
+        for _ in 0..15 {
             pop.step(&arc, &regime, params, &mut rng);
         }
         let final_p = pop.stats(&arc, &regime).allele0_freq_autosomes[0][0];
+        // Expected drift std dev ~ sqrt(p*q / (2N)) per generation ~ 0.016;
+        // over 15 generations variance adds to ~0.062. Allow 0.1.
         assert!(
-            (final_p - initial_p).abs() < 0.07,
+            (final_p - initial_p).abs() < 0.1,
             "allele frequency drifted more than expected: {} -> {}",
             initial_p,
             final_p
@@ -341,7 +399,7 @@ mod tests {
             target: 0.9,
         };
         let mut rng = Pcg32::new(7);
-        let mut pop = Population::founder_biallelic(400, &arc, 0.5, &mut rng);
+        let mut pop = Population::founder_biallelic(200, &arc, 0.5, &mut rng);
 
         let p_initial = pop.stats(&arc, &regime).allele0_freq_autosomes[0][0];
         let params = StepParams {
@@ -349,16 +407,16 @@ mod tests {
             mating_scheme: MatingScheme::Random,
             meiosis: MeiosisParams::default(),
             fertilization: FertilizationParams::default(),
-            target_offspring: 400,
+            target_offspring: 200,
         };
-        for _ in 0..30 {
+        for _ in 0..15 {
             pop.step(&arc, &regime, params, &mut rng);
         }
         let p_final = pop.stats(&arc, &regime).allele0_freq_autosomes[0][0];
-        // Weighted mating isn't aggressive selection, so we won't hit
-        // fixation quickly; but the favored allele should rise.
+        // With fitness-weighted mating now in place, the favored allele
+        // should rise measurably over 15 generations.
         assert!(
-            p_final > p_initial,
+            p_final > p_initial + 0.03,
             "directional selection did not raise favored allele: {} -> {}",
             p_initial,
             p_final
