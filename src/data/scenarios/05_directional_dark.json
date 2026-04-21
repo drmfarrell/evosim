@@ -1,0 +1,20 @@
+{
+  "name": "Directional selection: dark substrate",
+  "campbell_ref": "Chapter 23.4",
+  "summary": "Selection against light body color. Analog of the rock pocket mouse example in Campbell Figure 22.13.",
+  "archetype": "generic_fish",
+  "initial_population": {"N": 200, "allele_frequencies": {"BodyColor_B": 0.5}},
+  "selection_regime": "directional_dark",
+  "mutation_rate": 0.00001,
+  "crossover_rate": 1.0,
+  "mating_scheme": "random",
+  "events": [],
+  "stop_after_generation": 40,
+  "vidas_prompts": [
+    {"slot": "V", "prompt": "At generation 0, what proportion of fish are dark vs light?"},
+    {"slot": "I", "prompt": "Open the organism view on a dark fish. What genotype does it carry at BodyColor?"},
+    {"slot": "D", "prompt": "Over 40 generations, is survival equal across genotypes? Compare allele-0 frequency at start vs end."},
+    {"slot": "A", "prompt": "The population at generation 40 is adapted in what sense?"},
+    {"slot": "S", "prompt": "What specific selective pressure is acting here? What would happen if the substrate were light instead?"}
+  ]
+}

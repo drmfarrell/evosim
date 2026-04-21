@@ -1,0 +1,20 @@
+{
+  "name": "Hardy-Weinberg baseline",
+  "campbell_ref": "Chapter 23.2",
+  "summary": "At large N with no selection, no mutation, no migration, and random mating, allele frequencies stay in p² + 2pq + q² equilibrium.",
+  "archetype": "generic_fish",
+  "initial_population": {"N": 500, "allele_frequencies": {"default": 0.5}},
+  "selection_regime": "neutral",
+  "mutation_rate": 0.0,
+  "crossover_rate": 1.0,
+  "mating_scheme": "random",
+  "events": [],
+  "stop_after_generation": 50,
+  "vidas_prompts": [
+    {"slot": "V", "prompt": "At generation 0, describe the variation you see in body color in the tank."},
+    {"slot": "I", "prompt": "Pick one creature. Use the organism view to show the parent-child inheritance path back two generations."},
+    {"slot": "D", "prompt": "Track the allele-0 frequency for BodyColor over 50 generations. How much does it change?"},
+    {"slot": "A", "prompt": "Does the population look different in generation 50 than in generation 0?"},
+    {"slot": "S", "prompt": "Under what specific conditions does this baseline hold? What happens if you break one?"}
+  ]
+}

@@ -246,3 +246,25 @@ html, body {
 .allele-freq-chart {
   margin-top: 14px;
 }
+
+.meiosis-theater {
+  display: none;
+  margin-top: 12px;
+  font-size: 12px;
+}
+
+.meiosis-theater.active {
+  display: block;
+}
+
+.theater-controls {
+  margin-bottom: 10px;
+}
+
+.theater-block {
+  padding: 10px;
+  background: #0f141b;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  margin-bottom: 10px;
+}

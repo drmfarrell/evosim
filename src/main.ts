@@ -8,6 +8,7 @@ import { SceneManager } from "./scene/SceneManager";
 import { OrganismRenderer } from "./scene/OrganismRenderer";
 import { ChromosomePanel } from "./scene/ChromosomePanel";
 import { PopulationTank } from "./scene/PopulationTank";
+import { MeiosisTheater } from "./scene/MeiosisTheater";
 import { ForcePanel } from "./ui/ForcePanel";
 import { AlleleFreqChart } from "./ui/AlleleFreqChart";
 import { SimState, CreatureJson, Stats } from "./state/SimState";
@@ -27,6 +28,7 @@ let scene: SceneManager | null = null;
 let organismRenderer: OrganismRenderer | null = null;
 let chromosomePanel: ChromosomePanel | null = null;
 let tank: PopulationTank | null = null;
+let meiosisTheater: MeiosisTheater | null = null;
 let forcePanel: ForcePanel | null = null;
 let alleleChart: AlleleFreqChart | null = null;
 let selectedRegime = "neutral";
@@ -51,12 +53,22 @@ async function boot(): Promise<void> {
     panelMount.id = "force-panel-mount";
     const chartMount = document.createElement("div");
     chartMount.id = "allele-chart-mount";
+    const meiosisMount = document.createElement("div");
+    meiosisMount.id = "meiosis-theater-mount";
     const sidePanel = document.getElementById("side-panel") as HTMLElement;
+    sidePanel.appendChild(meiosisMount);
     sidePanel.appendChild(panelMount);
     sidePanel.appendChild(chartMount);
 
     forcePanel = new ForcePanel(panelMount, makeForceHandlers(), regimes);
     alleleChart = new AlleleFreqChart(chartMount, archetype.autosomes);
+    meiosisTheater = new MeiosisTheater(meiosisMount, state, archetype, (creatureJson) => {
+      if (!engine) return null;
+      const gameteJson = engine.meioseJson(creatureJson);
+      return JSON.parse(gameteJson);
+    });
+    state.onView.subscribe((v) => meiosisTheater?.setVisible(v === "meiosis"));
+    meiosisTheater.setVisible(state.view === "meiosis");
 
     const creatureJson = engine.randomCreatureJson(0.5);
     state.setSelected(JSON.parse(creatureJson));
