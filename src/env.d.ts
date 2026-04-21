@@ -17,6 +17,8 @@ declare module "./wasm-pkg/evosim_engine.js" {
     phenotypeJson(creatureJson: string): string;
     meioseJson(creatureJson: string): string;
     stepNeutral(mutationRate: number): void;
+    stepWithRegime(regime: string, mutationRate: number): void;
+    regimeNames(): string[];
     statsJson(): string;
     generation(): number;
     populationSize(): number;

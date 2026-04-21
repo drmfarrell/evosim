@@ -121,11 +121,34 @@ impl EvoEngine {
     }
 
     /// Advance the population by one generation under a neutral regime
-    /// (no selection; pure HW + drift). More elaborate regimes will
-    /// come via `stepWithRegime`.
+    /// (no selection; pure HW + drift).
     #[wasm_bindgen(js_name = stepNeutral)]
     pub fn step_neutral(&mut self, mutation_rate: f64) -> Result<(), JsError> {
-        let pop = self.population.as_mut().ok_or_else(|| JsError::new("no population"))?;
+        self.step_with_regime("neutral", mutation_rate)
+    }
+
+    /// Advance the population by one generation under a named regime
+    /// defined in the archetype's `fitness_regimes` map. Returns an
+    /// error if the regime is unknown.
+    #[wasm_bindgen(js_name = stepWithRegime)]
+    pub fn step_with_regime(
+        &mut self,
+        regime_name: &str,
+        mutation_rate: f64,
+    ) -> Result<(), JsError> {
+        let pop = self
+            .population
+            .as_mut()
+            .ok_or_else(|| JsError::new("no population"))?;
+        let regime = match regime_name {
+            "neutral" => archetype::FitnessRegime::Neutral,
+            other => self
+                .archetype
+                .fitness_regimes
+                .get(other)
+                .cloned()
+                .ok_or_else(|| JsError::new(&format!("unknown regime: {}", other)))?,
+        };
         let params = StepParams {
             mutation_rate,
             mating_scheme: mating::MatingScheme::Random,
@@ -133,7 +156,7 @@ impl EvoEngine {
             fertilization: fertilization::FertilizationParams::default(),
             target_offspring: pop.creatures.len(),
         };
-        pop.step(&self.archetype, &archetype::FitnessRegime::Neutral, params, &mut self.rng);
+        pop.step(&self.archetype, &regime, params, &mut self.rng);
         Ok(())
     }
 
@@ -141,10 +164,22 @@ impl EvoEngine {
     /// JSON.
     #[wasm_bindgen(js_name = statsJson)]
     pub fn stats_json(&self) -> Result<String, JsError> {
-        let pop = self.population.as_ref().ok_or_else(|| JsError::new("no population"))?;
+        let pop = self
+            .population
+            .as_ref()
+            .ok_or_else(|| JsError::new("no population"))?;
         let stats = pop.stats(&self.archetype, &archetype::FitnessRegime::Neutral);
         serde_json::to_string(&stats)
             .map_err(|e| JsError::new(&format!("stats serialize error: {}", e)))
+    }
+
+    /// Return the list of archetype regime names.
+    #[wasm_bindgen(js_name = regimeNames)]
+    pub fn regime_names(&self) -> Vec<String> {
+        let mut names: Vec<String> =
+            self.archetype.fitness_regimes.keys().cloned().collect();
+        names.sort();
+        names
     }
 
     /// Current generation counter.
