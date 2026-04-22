@@ -5,7 +5,7 @@ export default defineConfig({
   fullyParallel: true,
   retries: process.env.CI ? 1 : 0,
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: "http://localhost:3050",
     trace: "on-first-retry",
     viewport: { width: 1280, height: 800 },
   },
@@ -14,7 +14,7 @@ export default defineConfig({
   ],
   webServer: {
     command: "npm run dev",
-    url: "http://localhost:3000",
+    url: "http://localhost:3050",
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
   },

@@ -1,0 +1,18 @@
+{
+  "id": "pure_drift",
+  "order": 2,
+  "title": "Genetic drift at small N",
+  "short_desc": "Watch a small population lose diversity by chance alone, no selection.",
+  "campbell_ref": "Chapter 23.3",
+  "archetype": "generic_fish",
+  "initial_population": {"N": 30, "allele_frequencies": {"default": 0.5}},
+  "selection_regime": "neutral",
+  "mutation_rate": 0.0,
+  "mating_scheme": "random",
+  "events": [],
+  "auto_run": true,
+  "commentary": {
+    "headline": "Running: genetic drift at small N (N=30)",
+    "observe": "Allele frequencies wander randomly, and some alleles go to fixation (1.0) or are lost (0.0) purely by chance."
+  }
+}

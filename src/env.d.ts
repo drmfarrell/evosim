@@ -18,6 +18,8 @@ declare module "./wasm-pkg/evosim_engine.js" {
     meioseJson(creatureJson: string): string;
     stepNeutral(mutationRate: number): void;
     stepWithRegime(regime: string, mutationRate: number): void;
+    stepWithTarget(regime: string, mutationRate: number, targetOffspring: number): void;
+    bottleneckTo(n: number): void;
     regimeNames(): string[];
     statsJson(): string;
     generation(): number;

@@ -1,23 +1,21 @@
 {
-  "name": "Bottleneck and recovery",
-  "campbell_ref": "Chapter 23.3 (greater prairie chicken example)",
-  "summary": "Population crashes to N=10; genetic diversity collapses and does not recover without new mutation.",
+  "id": "bottleneck",
+  "order": 4,
+  "title": "Bottleneck and genetic diversity loss",
+  "short_desc": "A large population crashes to 10 survivors. Genetic diversity collapses.",
+  "campbell_ref": "Chapter 23.3 (greater prairie chicken)",
   "archetype": "generic_fish",
   "initial_population": {"N": 300, "allele_frequencies": {"default": 0.5}},
   "selection_regime": "neutral",
   "mutation_rate": 0.0,
-  "crossover_rate": 1.0,
   "mating_scheme": "random",
   "events": [
-    {"type": "bottleneck", "generation": 15, "new_size": 10},
-    {"type": "recovery", "generation": 16, "new_size": 300}
+    {"type": "bottleneck", "generation": 10, "new_size": 10},
+    {"type": "recovery", "generation": 11, "new_size": 300}
   ],
-  "stop_after_generation": 40,
-  "vidas_prompts": [
-    {"slot": "V", "prompt": "Read H_obs and H_exp at generation 0. How diverse is the population?"},
-    {"slot": "I", "prompt": "After the bottleneck, how many founder individuals contribute to the future gene pool?"},
-    {"slot": "D", "prompt": "Compare H_obs at generation 15 vs generation 16. Compare again at generation 40."},
-    {"slot": "A", "prompt": "Has the population 'adapted' to the bottleneck? Or something else?"},
-    {"slot": "S", "prompt": "Bottlenecks are not selection. What process is driving the observed change?"}
-  ]
+  "auto_run": true,
+  "commentary": {
+    "headline": "Running: bottleneck at gen 10 (300 → 10 → 300)",
+    "observe": "Heterozygosity (H_obs in the stats box) drops sharply at generation 10 and does NOT recover on its own. Watch for alleles that go to fixation by chance during the bottleneck."
+  }
 }

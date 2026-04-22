@@ -1,7 +1,7 @@
 // EvoSim entry point. HARD CAP 300 LINES (see CLAUDE.md). This file
-// wires the canvas, the SimState, the archetype loader, the engine
-// (WASM), and the view-specific renderers. Any logic heavier than
-// wiring belongs in state/, scene/, or ui/.
+// wires the canvas, the SimState, the archetype + scenarios, the
+// engine (WASM), and the view-specific renderers. Any logic heavier
+// than wiring belongs in state/, scene/, or ui/.
 
 import "./style.css";
 import { SceneManager } from "./scene/SceneManager";
@@ -11,8 +11,11 @@ import { PopulationTank } from "./scene/PopulationTank";
 import { MeiosisTheater } from "./scene/MeiosisTheater";
 import { ForcePanel } from "./ui/ForcePanel";
 import { AlleleFreqChart } from "./ui/AlleleFreqChart";
+import { ScenarioDeck, Scenario } from "./ui/ScenarioDeck";
+import { Commentary } from "./ui/Commentary";
+import { ScenarioRunner } from "./ui/ScenarioRunner";
 import { SimState, CreatureJson, Stats } from "./state/SimState";
-import { loadArchetype } from "./utils/loader";
+import { loadArchetype, loadAllScenarios } from "./utils/loader";
 
 import init, { EvoEngine } from "./wasm-pkg/evosim_engine.js";
 
@@ -22,6 +25,8 @@ const chromosomeMount = document.getElementById("chromosome-panel") as HTMLEleme
 const statsMount = document.getElementById("stats-readout") as HTMLElement;
 const generationLabel = document.getElementById("generation-label") as HTMLElement;
 const scenarioLabel = document.getElementById("scenario-label") as HTMLElement;
+const scenarioDeckMount = document.getElementById("scenario-deck-mount") as HTMLElement;
+const commentaryMount = document.getElementById("commentary-mount") as HTMLElement;
 
 let engine: EvoEngine | null = null;
 let scene: SceneManager | null = null;
@@ -31,9 +36,9 @@ let tank: PopulationTank | null = null;
 let meiosisTheater: MeiosisTheater | null = null;
 let forcePanel: ForcePanel | null = null;
 let alleleChart: AlleleFreqChart | null = null;
-let selectedRegime = "neutral";
-let mutationRate = 1e-4;
-let runInterval: number | null = null;
+let scenarioDeck: ScenarioDeck | null = null;
+let commentary: Commentary | null = null;
+let scenarioRunner: ScenarioRunner | null = null;
 
 async function boot(): Promise<void> {
   try {
@@ -42,117 +47,111 @@ async function boot(): Promise<void> {
     state.setArchetype(archetype);
     const archetypeJsonStr = JSON.stringify(archetype);
     engine = new EvoEngine(archetypeJsonStr, BigInt(Date.now()));
-    const regimes = ["neutral", ...engine.regimeNames().filter((r) => r !== "neutral")];
 
     scene = new SceneManager(canvas);
     organismRenderer = new OrganismRenderer(scene, state, archetype);
     chromosomePanel = new ChromosomePanel(chromosomeMount, state, archetype);
     tank = new PopulationTank(scene, state, archetype);
+    commentary = new Commentary(commentaryMount);
 
+    const sidePanel = document.getElementById("side-panel") as HTMLElement;
     const panelMount = document.createElement("div");
-    panelMount.id = "force-panel-mount";
     const chartMount = document.createElement("div");
-    chartMount.id = "allele-chart-mount";
     const meiosisMount = document.createElement("div");
     meiosisMount.id = "meiosis-theater-mount";
-    const sidePanel = document.getElementById("side-panel") as HTMLElement;
     sidePanel.appendChild(meiosisMount);
     sidePanel.appendChild(panelMount);
     sidePanel.appendChild(chartMount);
 
+    const regimes = ["neutral", ...engine.regimeNames().filter((r) => r !== "neutral")];
     forcePanel = new ForcePanel(panelMount, makeForceHandlers(), regimes);
     alleleChart = new AlleleFreqChart(chartMount, archetype.autosomes);
-    meiosisTheater = new MeiosisTheater(meiosisMount, state, archetype, (creatureJson) => {
-      if (!engine) return null;
-      const gameteJson = engine.meioseJson(creatureJson);
-      return JSON.parse(gameteJson);
-    });
+    meiosisTheater = new MeiosisTheater(meiosisMount, state, archetype, (creatureJson) =>
+      engine ? JSON.parse(engine.meioseJson(creatureJson)) : null
+    );
     state.onView.subscribe((v) => meiosisTheater?.setVisible(v === "meiosis"));
     meiosisTheater.setVisible(state.view === "meiosis");
 
-    const creatureJson = engine.randomCreatureJson(0.5);
-    state.setSelected(JSON.parse(creatureJson));
+    scenarioRunner = new ScenarioRunner(engine as any, {
+      onAfterStep: handleAfterStep,
+      onStateChange: (r) => forcePanel?.setRunning(r),
+    });
 
-    scenarioLabel.textContent = "Archetype: generic_fish";
+    const scenarios = (await loadAllScenarios()) as Scenario[];
+    scenarioDeck = new ScenarioDeck(scenarioDeckMount, scenarios, runScenario);
+
+    state.setSelected(JSON.parse(engine.randomCreatureJson(0.5)));
+    scenarioLabel.textContent = "Pick an experiment to begin";
     updateGenerationLabel();
-    exposeDebugHandles();
     wireViewSwitcher();
     renderStats();
+    exposeDebugHandles();
+
+    // Auto-start the first experiment so the landing view is alive.
+    if (scenarios.length > 0) {
+      runScenario(scenarios[0]);
+    }
   } catch (e) {
     renderError(e);
   }
+}
+
+function runScenario(s: Scenario): void {
+  if (!scenarioRunner || !scenarioDeck || !commentary) return;
+  scenarioRunner.load(s);
+  scenarioDeck.setActive(s.id);
+  alleleChart?.reset();
+  state.setView("tank");
+  setActiveViewButton("tank");
+  handleAfterStep();
+  if (s.commentary) {
+    commentary.show({
+      headline: s.commentary.headline,
+      observe: s.commentary.observe,
+      generation: scenarioRunner.generation,
+    });
+  } else {
+    commentary.hide();
+  }
+  scenarioLabel.textContent = `Experiment: ${s.title}`;
+  if (s.auto_run) scenarioRunner.play();
+}
+
+function handleAfterStep(): void {
+  if (!engine) return;
+  const popJson = engine.populationJson();
+  const creatures: CreatureJson[] = JSON.parse(popJson);
+  tank?.setPopulation(creatures);
+  if (creatures.length > 0) state.setSelected(creatures[0]);
+  const statsJson = engine.statsJson();
+  const stats: Stats = JSON.parse(statsJson);
+  state.setStats(stats);
+  alleleChart?.addFrame(stats.generation, stats.allele0_freq_autosomes);
+  commentary?.updateGeneration(stats.generation);
+  updateGenerationLabel();
 }
 
 function makeForceHandlers() {
   return {
     onPlayPause: () => {
-      state.setRunning(!state.running);
-      if (state.running) startRunLoop();
-      else stopRunLoop();
-      forcePanel?.setRunning(state.running);
+      if (!scenarioRunner) return;
+      if (scenarioRunner.isRunning) scenarioRunner.pause();
+      else if (scenarioRunner.scenario) scenarioRunner.play();
     },
-    onStep: () => {
-      stepOne();
-    },
+    onStep: () => scenarioRunner?.step(),
     onRegimeChange: (r: string) => {
-      selectedRegime = r;
+      const cur = scenarioRunner?.scenario;
+      if (cur) (cur as any).selection_regime = r;
     },
     onMutationRateChange: (r: number) => {
-      mutationRate = r;
+      const cur = scenarioRunner?.scenario;
+      if (cur) (cur as any).mutation_rate = r;
     },
-    onInitPopulation: (n: number) => {
-      if (!engine) return;
-      engine.initPopulationBiallelic(n, 0.5);
-      syncPopulation();
-      alleleChart?.reset();
-      recordFrame();
-      state.setView("tank");
-      activateTankView();
+    onInitPopulation: (_n: number) => {
+      // Legacy Init-N buttons no longer drive the simulation; use a
+      // scenario card instead. Kept for force-panel compatibility.
     },
   };
-}
-
-function stepOne(): void {
-  if (!engine) return;
-  try {
-    engine.stepWithRegime(selectedRegime, mutationRate);
-    syncPopulation();
-    recordFrame();
-    updateGenerationLabel();
-  } catch (e) {
-    renderError(e);
-    stopRunLoop();
-  }
-}
-
-function startRunLoop(): void {
-  if (runInterval != null) return;
-  runInterval = window.setInterval(() => stepOne(), 250);
-}
-
-function stopRunLoop(): void {
-  if (runInterval != null) {
-    clearInterval(runInterval);
-    runInterval = null;
-  }
-}
-
-function syncPopulation(): void {
-  if (!engine || !tank) return;
-  const popJson = engine.populationJson();
-  const creatures: CreatureJson[] = JSON.parse(popJson);
-  tank.setPopulation(creatures);
-  if (creatures.length > 0) {
-    state.setSelected(creatures[0]);
-  }
-}
-
-function recordFrame(): void {
-  if (!engine || !alleleChart) return;
-  const statsJson = engine.statsJson();
-  const s: Stats = JSON.parse(statsJson);
-  state.setStats(s);
-  alleleChart.addFrame(s.generation, s.allele0_freq_autosomes);
 }
 
 function updateGenerationLabel(): void {
@@ -160,10 +159,10 @@ function updateGenerationLabel(): void {
   generationLabel.textContent = `Generation ${gen}`;
 }
 
-function activateTankView(): void {
+function setActiveViewButton(view: "organism" | "meiosis" | "tank"): void {
   const buttons = document.querySelectorAll<HTMLButtonElement>(".view-btn");
   for (const b of Array.from(buttons)) {
-    b.classList.toggle("active", b.dataset.view === "tank");
+    b.classList.toggle("active", b.dataset.view === view);
   }
 }
 
@@ -173,9 +172,7 @@ function wireViewSwitcher(): void {
     b.addEventListener("click", () => {
       const view = b.dataset.view as "organism" | "meiosis" | "tank";
       state.setView(view);
-      for (const other of Array.from(buttons)) {
-        other.classList.toggle("active", other === b);
-      }
+      setActiveViewButton(view);
     });
   }
 }
@@ -186,18 +183,16 @@ function renderStats(): void {
   const s = state.stats;
   const lines: string[] = [];
   if (c) {
-    lines.push(`id: ${c.id}`);
-    lines.push(`sex: ${c.sex}`);
-    lines.push(`generation: ${c.generation}`);
+    lines.push(`selected creature: id ${c.id}, ${c.sex}, gen ${c.generation}`);
   }
   if (s) {
-    lines.push(`N: ${s.n}`);
+    lines.push(`population N: ${s.n}`);
     lines.push(`mean fitness: ${s.mean_fitness.toFixed(3)}`);
     lines.push(`H_obs: ${s.observed_heterozygosity.toFixed(3)}`);
     lines.push(`H_exp: ${s.expected_heterozygosity.toFixed(3)}`);
   }
   if (lines.length === 0) {
-    statsMount.textContent = "No creature selected.";
+    statsMount.textContent = "Pick an experiment.";
     return;
   }
   statsMount.innerHTML = lines.map((l) => `<div>${l}</div>`).join("");
@@ -219,7 +214,9 @@ function exposeDebugHandles(): void {
     state,
     engine,
     scene,
-    stepOne,
+    scenarioRunner,
+    scenarioDeck,
+    runScenario,
   };
 }
 

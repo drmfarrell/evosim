@@ -1,0 +1,8 @@
+{
+  "scenarios": [
+    "01_hardy_weinberg",
+    "02_pure_drift",
+    "05_directional_dark",
+    "03_bottleneck"
+  ]
+}

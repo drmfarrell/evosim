@@ -268,3 +268,144 @@ html, body {
   border-radius: 4px;
   margin-bottom: 10px;
 }
+
+/* ---- Scenario deck ---- */
+
+.scenario-deck {
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.deck-header {
+  margin-bottom: 10px;
+}
+
+.deck-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.deck-subtitle {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.deck-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.deck-card {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  padding: 8px 10px;
+  background: #0f141b;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.deck-card.active {
+  border-color: var(--accent);
+  background: #122030;
+}
+
+.deck-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.deck-card-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+
+.deck-card-desc {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.deck-card-ref {
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+.deck-card-play {
+  flex-shrink: 0;
+  align-self: center;
+  background: var(--accent);
+  color: #0b1018;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 3px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.deck-card-play:hover {
+  filter: brightness(1.1);
+}
+
+/* ---- Commentary banner ---- */
+
+.commentary {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  padding: 10px 14px;
+  background: rgba(10, 14, 20, 0.92);
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  color: var(--text);
+  pointer-events: none;
+  backdrop-filter: blur(6px);
+  font-size: 12px;
+  line-height: 1.4;
+  z-index: 5;
+}
+
+.commentary.hidden {
+  display: none;
+}
+
+.commentary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.commentary-headline {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.commentary-gen {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.commentary-observe {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}

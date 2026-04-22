@@ -182,6 +182,65 @@ impl EvoEngine {
         names
     }
 
+    /// Bottleneck: sample `n` random survivors from the current
+    /// population (without replacement) and replace the population
+    /// with them. If `n >= current_size`, no-op. Does not change the
+    /// generation counter.
+    #[wasm_bindgen(js_name = bottleneckTo)]
+    pub fn bottleneck_to(&mut self, n: usize) -> Result<(), JsError> {
+        let pop = self
+            .population
+            .as_mut()
+            .ok_or_else(|| JsError::new("no population"))?;
+        let cur = pop.creatures.len();
+        if n >= cur {
+            return Ok(());
+        }
+        let mut indices: Vec<usize> = (0..cur).collect();
+        for i in 0..n {
+            let j = i + self.rng.gen_range_usize(indices.len() - i);
+            indices.swap(i, j);
+        }
+        indices.truncate(n);
+        let new_pop: Vec<creature::Creature> =
+            indices.into_iter().map(|i| pop.creatures[i].clone()).collect();
+        pop.creatures = new_pop;
+        Ok(())
+    }
+
+    /// Step one generation, producing `target_offspring` offspring
+    /// under the given regime. Enables recovery after a bottleneck.
+    #[wasm_bindgen(js_name = stepWithTarget)]
+    pub fn step_with_target(
+        &mut self,
+        regime_name: &str,
+        mutation_rate: f64,
+        target_offspring: usize,
+    ) -> Result<(), JsError> {
+        let pop = self
+            .population
+            .as_mut()
+            .ok_or_else(|| JsError::new("no population"))?;
+        let regime = match regime_name {
+            "neutral" => archetype::FitnessRegime::Neutral,
+            other => self
+                .archetype
+                .fitness_regimes
+                .get(other)
+                .cloned()
+                .ok_or_else(|| JsError::new(&format!("unknown regime: {}", other)))?,
+        };
+        let params = StepParams {
+            mutation_rate,
+            mating_scheme: mating::MatingScheme::Random,
+            meiosis: MeiosisParams::default(),
+            fertilization: fertilization::FertilizationParams::default(),
+            target_offspring,
+        };
+        pop.step(&self.archetype, &regime, params, &mut self.rng);
+        Ok(())
+    }
+
     /// Current generation counter.
     #[wasm_bindgen(js_name = generation)]
     pub fn generation(&self) -> u32 {

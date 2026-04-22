@@ -1,9 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-// Verifies the population tank: init population, step generations,
-// observe stats + allele-freq chart updates.
-
-test("init population N=50 and step neutral for 5 generations", async ({ page }) => {
+test("scenario runs and advances generation through the runner", async ({ page }) => {
   test.setTimeout(60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -12,74 +9,63 @@ test("init population N=50 and step neutral for 5 generations", async ({ page })
   });
 
   await page.goto("/");
+  await page.waitForSelector(".deck-card", { timeout: 10_000 });
 
-  // Wait for boot.
-  await page.waitForSelector("#chromosome-panel .locus-band", { timeout: 10_000 });
-
-  // Click Init N=50.
-  await page.getByRole("button", { name: "Init N=50" }).click();
-
-  // Tank view should be active.
-  await expect(page.locator(".view-btn[data-view='tank']")).toHaveClass(/active/);
-
-  // Stats should show N = 50.
-  await expect(page.locator("#stats-readout")).toContainText("N: 50", { timeout: 5_000 });
-
-  // Drive 5 steps directly through the engine to avoid UI-side
-  // rebuild overhead per step. UI sync happens once at the end.
+  // Stop the auto-started scenario so we can observe a specific gen count.
   await page.evaluate(() => {
     // @ts-ignore
-    const ev = window.__evosim;
-    for (let i = 0; i < 5; i++) ev.engine.stepNeutral(0);
+    window.__evosim.scenarioRunner.pause();
   });
 
-  // Force one UI sync after the 5 steps.
+  // Click Hardy-Weinberg card (auto-running will tick it).
+  const hw = page.locator(".deck-card", { hasText: "Hardy-Weinberg" });
+  await hw.getByRole("button", { name: /Run/ }).click();
+  // Pause immediately so we can count.
   await page.evaluate(() => {
     // @ts-ignore
-    window.__evosim.stepOne();
+    window.__evosim.scenarioRunner.pause();
   });
 
-  await expect(page.locator("#generation-label")).toContainText("Generation 6");
+  const genBefore = await page.evaluate(() => {
+    // @ts-ignore
+    return window.__evosim.engine.generation();
+  });
 
-  // Allele-freq chart canvas exists and is drawn.
-  const canvas = page.locator("#allele-chart-mount canvas");
-  await expect(canvas).toBeVisible();
+  await page.evaluate(() => {
+    // @ts-ignore
+    const r = window.__evosim.scenarioRunner;
+    for (let i = 0; i < 5; i++) r.step();
+  });
 
+  const genAfter = await page.evaluate(() => {
+    // @ts-ignore
+    return window.__evosim.engine.generation();
+  });
+
+  expect(genAfter - genBefore).toBe(5);
   expect(errors).toEqual([]);
 });
 
-test("directional selection raises the favored allele over 15 generations", async ({ page }) => {
+test("directional selection scenario drops the favored light allele", async ({ page }) => {
   test.setTimeout(60_000);
   await page.goto("/");
-  await page.waitForSelector("#chromosome-panel .locus-band");
+  await page.waitForSelector(".deck-card");
 
-  await page.getByRole("button", { name: "Init N=200" }).click();
-  await expect(page.locator("#stats-readout")).toContainText("N: 200", { timeout: 5_000 });
-
-  await page.selectOption("#regime-select", "directional_dark");
-
-  // Drive the simulation directly through the debug handle to avoid
-  // per-click overhead. Steps 15 generations under the selected regime.
-  const { before, after } = (await page.evaluate(async () => {
+  // Single evaluate that pauses, loads the scenario, steps 15 gens
+  // directly on the engine, and reads allele frequencies. Avoids
+  // racing with the auto-run timer.
+  const result = (await page.evaluate(() => {
     // @ts-ignore
     const ev = window.__evosim;
-    // @ts-ignore
-    const engine = ev.engine;
-    const readP = () => {
-      const j = engine.statsJson();
-      const s = JSON.parse(j);
-      return s.allele0_freq_autosomes[0][0];
-    };
-    const before = readP();
+    ev.scenarioRunner.pause();
+    ev.engine.initPopulationBiallelic(200, 0.5);
+    const before = JSON.parse(ev.engine.statsJson()).allele0_freq_autosomes[0][0];
     for (let i = 0; i < 15; i++) {
-      engine.stepWithRegime("directional_dark", 0);
+      ev.engine.stepWithRegime("directional_dark", 0);
     }
-    const after = readP();
+    const after = JSON.parse(ev.engine.statsJson()).allele0_freq_autosomes[0][0];
     return { before, after };
   })) as { before: number; after: number };
 
-  // directional_dark targets the high body_color_hue (value 0.82)
-  // which maps to "bb" (allele 1 homozygous). So allele-0 frequency
-  // should drop measurably over 15 generations.
-  expect(after).toBeLessThan(before - 0.02);
+  expect(result.after).toBeLessThan(result.before - 0.02);
 });
