@@ -15,6 +15,7 @@ import { ScenarioDeck, Scenario } from "./ui/ScenarioDeck";
 import { Commentary } from "./ui/Commentary";
 import { ScenarioRunner } from "./ui/ScenarioRunner";
 import { SpeedSlider } from "./ui/SpeedSlider";
+import { ViewHelp } from "./ui/ViewHelp";
 import { SimState, CreatureJson, Stats } from "./state/SimState";
 import { loadArchetype, loadAllScenarios } from "./utils/loader";
 
@@ -29,6 +30,7 @@ const scenarioLabel = document.getElementById("scenario-label") as HTMLElement;
 const scenarioDeckMount = document.getElementById("scenario-deck-mount") as HTMLElement;
 const speedSliderMount = document.getElementById("speed-slider-mount") as HTMLElement;
 const commentaryMount = document.getElementById("commentary-mount") as HTMLElement;
+const viewHelpMount = document.getElementById("view-help-mount") as HTMLElement;
 
 let engine: EvoEngine | null = null;
 let scene: SceneManager | null = null;
@@ -56,18 +58,13 @@ async function boot(): Promise<void> {
     chromosomePanel = new ChromosomePanel(chromosomeMount, state, archetype);
     tank = new PopulationTank(scene, state, archetype);
     commentary = new Commentary(commentaryMount);
+    new ViewHelp(viewHelpMount, state);
 
-    const sidePanel = document.getElementById("side-panel") as HTMLElement;
-    const panelMount = document.createElement("div");
-    const chartMount = document.createElement("div");
-    const meiosisMount = document.createElement("div");
-    meiosisMount.id = "meiosis-theater-mount";
-    sidePanel.appendChild(meiosisMount);
-    sidePanel.appendChild(panelMount);
-    sidePanel.appendChild(chartMount);
+    const panelMount = document.getElementById("force-panel-mount") as HTMLElement;
+    const chartMount = document.getElementById("allele-chart-mount") as HTMLElement;
+    const meiosisMount = document.getElementById("meiosis-theater-mount") as HTMLElement;
 
-    const regimes = ["neutral", ...engine.regimeNames().filter((r) => r !== "neutral")];
-    forcePanel = new ForcePanel(panelMount, makeForceHandlers(), regimes);
+    forcePanel = new ForcePanel(panelMount, makeForceHandlers());
     alleleChart = new AlleleFreqChart(chartMount, archetype.autosomes);
     meiosisTheater = new MeiosisTheater(meiosisMount, state, archetype, (creatureJson) =>
       engine ? JSON.parse(engine.meioseJson(creatureJson)) : null
@@ -146,17 +143,9 @@ function makeForceHandlers() {
       else if (scenarioRunner.scenario) scenarioRunner.play();
     },
     onStep: () => scenarioRunner?.step(),
-    onRegimeChange: (r: string) => {
+    onReset: () => {
       const cur = scenarioRunner?.scenario;
-      if (cur) (cur as any).selection_regime = r;
-    },
-    onMutationRateChange: (r: number) => {
-      const cur = scenarioRunner?.scenario;
-      if (cur) (cur as any).mutation_rate = r;
-    },
-    onInitPopulation: (_n: number) => {
-      // Legacy Init-N buttons no longer drive the simulation; use a
-      // scenario card instead. Kept for force-panel compatibility.
+      if (cur) runScenario(cur);
     },
   };
 }

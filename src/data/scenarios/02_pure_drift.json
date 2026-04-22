@@ -10,7 +10,7 @@
   "mutation_rate": 0.0,
   "mating_scheme": "random",
   "events": [],
-  "auto_run": true,
+  "auto_run": false,
   "commentary": {
     "headline": "Running: genetic drift at small N (N=30)",
     "observe": "Allele frequencies wander randomly, and some alleles go to fixation (1.0) or are lost (0.0) purely by chance."

@@ -10,7 +10,7 @@
   "mutation_rate": 0.0,
   "mating_scheme": "random",
   "events": [],
-  "auto_run": true,
+  "auto_run": false,
   "commentary": {
     "headline": "Running: Hardy-Weinberg baseline (N=120, no selection)",
     "observe": "Watch the allele-frequency chart. All lines should stay near their starting values, with small fluctuations from sampling."

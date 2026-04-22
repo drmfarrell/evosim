@@ -13,7 +13,7 @@
     {"type": "bottleneck", "generation": 10, "new_size": 10},
     {"type": "recovery", "generation": 11, "new_size": 300}
   ],
-  "auto_run": true,
+  "auto_run": false,
   "commentary": {
     "headline": "Running: bottleneck at gen 10 (300 → 10 → 300)",
     "observe": "Heterozygosity (H_obs in the stats box) drops sharply at generation 10 and does NOT recover on its own. Watch for alleles that go to fixation by chance during the bottleneck."

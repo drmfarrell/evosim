@@ -10,7 +10,7 @@
   "mutation_rate": 0.00001,
   "mating_scheme": "random",
   "events": [],
-  "auto_run": true,
+  "auto_run": false,
   "commentary": {
     "headline": "Running: directional selection against light coats (N=200)",
     "observe": "The dark allele (recessive, phenotype value ~0.82) should sweep the population. Watch BodyColor's line on the chart drop from 0.5 toward 0."
