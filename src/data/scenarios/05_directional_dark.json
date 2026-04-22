@@ -13,6 +13,6 @@
   "auto_run": false,
   "commentary": {
     "headline": "Running: directional selection against light coats (N=200)",
-    "observe": "The dark allele (recessive, phenotype value ~0.82) should sweep the population. Watch BodyColor's line on the chart drop from 0.5 toward 0."
+    "observe": "The recessive dark allele 'b' should sweep the population. Watch the tank darken, and the BodyColor line on the chart drop from 0.5 toward 0 (that's the dominant light 'B' allele disappearing)."
   }
 }

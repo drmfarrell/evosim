@@ -119,7 +119,7 @@
   "phenotype_mappings": {
     "BodyColor": {
       "type": "lookup",
-      "values_by_genotype": {"BB": 0.18, "Bb": 0.18, "bb": 0.82}
+      "values_by_genotype": {"BB": 0.82, "Bb": 0.82, "bb": 0.18}
     },
     "CoatPattern": {
       "type": "lookup",
@@ -170,13 +170,13 @@
       "type": "linear",
       "channel": "body_color_hue",
       "weight": 1.2,
-      "target": 0.9
+      "target": 0.1
     },
     "directional_light": {
       "type": "linear",
       "channel": "body_color_hue",
       "weight": 1.2,
-      "target": 0.1
+      "target": 0.9
     },
     "stabilizing_size_medium": {
       "type": "gaussian",
