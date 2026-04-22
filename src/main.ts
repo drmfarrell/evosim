@@ -196,14 +196,26 @@ function renderStats(): void {
 
 function renderError(e: unknown): void {
   const msg = e instanceof Error ? e.message : String(e);
-  const el = document.createElement("pre");
-  el.textContent = `boot error: ${msg}`;
-  el.style.color = "var(--bad)";
-  el.style.padding = "12px";
-  el.style.whiteSpace = "pre-wrap";
-  document.body.appendChild(el);
+  let el = document.getElementById("evosim-error-banner") as HTMLElement | null;
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "evosim-error-banner";
+    el.style.cssText = `
+      position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+      background: #3a1013; border: 1px solid #e5484d; color: #ffcccc;
+      padding: 10px 14px; border-radius: 4px; z-index: 999; max-width: 80vw;
+      font-family: ui-monospace, monospace; font-size: 12px; white-space: pre-wrap;
+    `;
+    document.body.appendChild(el);
+  }
+  el.textContent = `evosim error: ${msg}\nTry a hard reload (Ctrl+Shift+R).`;
   console.error(e);
 }
+
+// Catch post-boot errors (e.g. WASM traps mid-run) so the student sees
+// something rather than a blank stuck scene.
+window.addEventListener("error", (e) => renderError(e.error ?? e.message));
+window.addEventListener("unhandledrejection", (e) => renderError(e.reason));
 
 function exposeDebugHandles(): void {
   (globalThis as any).__evosim = {
