@@ -23,6 +23,7 @@ export class ScenarioRunner {
   private current: Scenario | null = null;
   private timer: number | null = null;
   private targetSize: number = 0;
+  private periodMs: number = 700;
 
   constructor(engine: EngineHandle, private handlers: ScenarioRunnerHandlers) {
     this.engine = engine;
@@ -37,10 +38,20 @@ export class ScenarioRunner {
     this.handlers.onAfterStep();
   }
 
-  play(periodMs: number = 250): void {
+  /** Change the tick rate; restarts the timer if currently running. */
+  setPeriod(periodMs: number): void {
+    this.periodMs = Math.max(20, periodMs);
+    if (this.timer != null) {
+      clearInterval(this.timer);
+      this.timer = window.setInterval(() => this.step(), this.periodMs);
+    }
+  }
+
+  play(periodMs?: number): void {
     if (this.timer != null) return;
     if (!this.current) return;
-    this.timer = window.setInterval(() => this.step(), periodMs);
+    if (periodMs != null) this.periodMs = periodMs;
+    this.timer = window.setInterval(() => this.step(), this.periodMs);
     this.handlers.onStateChange?.(true);
   }
 

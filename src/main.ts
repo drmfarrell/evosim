@@ -14,6 +14,7 @@ import { AlleleFreqChart } from "./ui/AlleleFreqChart";
 import { ScenarioDeck, Scenario } from "./ui/ScenarioDeck";
 import { Commentary } from "./ui/Commentary";
 import { ScenarioRunner } from "./ui/ScenarioRunner";
+import { SpeedSlider } from "./ui/SpeedSlider";
 import { SimState, CreatureJson, Stats } from "./state/SimState";
 import { loadArchetype, loadAllScenarios } from "./utils/loader";
 
@@ -26,6 +27,7 @@ const statsMount = document.getElementById("stats-readout") as HTMLElement;
 const generationLabel = document.getElementById("generation-label") as HTMLElement;
 const scenarioLabel = document.getElementById("scenario-label") as HTMLElement;
 const scenarioDeckMount = document.getElementById("scenario-deck-mount") as HTMLElement;
+const speedSliderMount = document.getElementById("speed-slider-mount") as HTMLElement;
 const commentaryMount = document.getElementById("commentary-mount") as HTMLElement;
 
 let engine: EvoEngine | null = null;
@@ -39,6 +41,7 @@ let alleleChart: AlleleFreqChart | null = null;
 let scenarioDeck: ScenarioDeck | null = null;
 let commentary: Commentary | null = null;
 let scenarioRunner: ScenarioRunner | null = null;
+let speedSlider: SpeedSlider | null = null;
 
 async function boot(): Promise<void> {
   try {
@@ -79,6 +82,10 @@ async function boot(): Promise<void> {
 
     const scenarios = (await loadAllScenarios()) as Scenario[];
     scenarioDeck = new ScenarioDeck(scenarioDeckMount, scenarios, runScenario);
+    speedSlider = new SpeedSlider(speedSliderMount, (c) => {
+      scenarioRunner?.setPeriod(c.periodMs);
+      tank?.setBehaviorSpeed(c.behaviorMultiplier);
+    });
 
     state.setSelected(JSON.parse(engine.randomCreatureJson(0.5)));
     scenarioLabel.textContent = "Pick an experiment to begin";

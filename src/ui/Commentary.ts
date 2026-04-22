@@ -38,6 +38,11 @@ export class Commentary {
 
   updateGeneration(g: number): void {
     this.genEl.textContent = `Generation ${g}`;
+    // Brief flash so each new generation is visible.
+    this.genEl.classList.remove("tick");
+    // Re-reading offsetWidth forces a reflow so the animation restarts.
+    void this.genEl.offsetWidth;
+    this.genEl.classList.add("tick");
   }
 
   hide(): void {

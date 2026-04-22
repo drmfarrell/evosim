@@ -229,16 +229,22 @@ minimal and document them in this section as they exist.
   kernel, not a persistent pool.
 - **Reaching for `nightly` Rust.** You are probably about to thread.
   Don't.
-- **Adding behavioral AI.** Creatures do not forage, flee, fight, or
-  decide. Fitness is configured (declared), not emergent. See EVOSIM_SPEC
-  §1.2 and §3.5.
+- **Adding behavioral AI that feeds back into fitness.** Fitness stays
+  configured (declared) per the regime. Decorative behavior IS allowed
+  and encouraged when it helps students see phenotype-driven
+  differences (e.g., a fast-metabolism fish swims to food faster; a
+  strong-display fish wiggles more during courtship). The invariant
+  is: the behavior does not alter who reproduces. Mating pairs are
+  still sampled by the mating scheme + fitness weights in the engine,
+  not by "which fish happened to be close to each other on screen."
 - **Adding predators, prey, food, decomposers, or pathogens as
   simulated entities.** Out of scope (Campbell ecology is chs 52+).
 - **Adding molecular-biology vocabulary to default UI.** Students haven't
   seen chs 16-21. See §15.3 of the spec.
 - **Using emergent motion as a proxy for fitness.** Intra-generation
-  motion is decorative only. Fitness must be computed from genotype
-  under the configured regime.
+  motion is decorative only, even when it looks purposeful (food
+  seeking, courtship circling). Fitness must still be computed from
+  genotype under the configured regime.
 - **Hardcoding any genome parameter.** Ploidy, chromosome count, locus
   count, allele count, cM lengths, dominance modes — all data-driven
   from the archetype JSON.

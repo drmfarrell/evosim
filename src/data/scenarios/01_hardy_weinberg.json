@@ -5,14 +5,14 @@
   "short_desc": "With no selection, no mutation, and random mating, allele frequencies stay steady.",
   "campbell_ref": "Chapter 23.2",
   "archetype": "generic_fish",
-  "initial_population": {"N": 300, "allele_frequencies": {"default": 0.5}},
+  "initial_population": {"N": 120, "allele_frequencies": {"default": 0.5}},
   "selection_regime": "neutral",
   "mutation_rate": 0.0,
   "mating_scheme": "random",
   "events": [],
   "auto_run": true,
   "commentary": {
-    "headline": "Running: Hardy-Weinberg baseline (N=300, no selection)",
+    "headline": "Running: Hardy-Weinberg baseline (N=120, no selection)",
     "observe": "Watch the allele-frequency chart. All lines should stay near their starting values, with small fluctuations from sampling."
   }
 }

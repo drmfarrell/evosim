@@ -1,42 +1,57 @@
-// Population tank: N creatures swimming in a 3D box. The box reuses
-// the ChemSim volumetric aesthetic (box walls, soft fog, caustic-style
-// light) without ChemSim's physics. Creatures are simplified (single
-// body mesh per instance + optional tail); full detail lives in the
-// organism view.
-//
-// Movement is purely kinematic: each creature carries a per-instance
-// orientation + phase that drives a Perlin-style drift. This is
-// *decorative only*, never causal. Fitness is configured, not
-// emergent.
+// Population tank: N creatures swimming in a 3D box. The tank is the
+// ChemSim-style volumetric container; fish inside exhibit decorative
+// behavior (seeking food, occasional courtship) that does NOT feed
+// back into fitness. Fitness is configured per the active regime in
+// Rust; these behaviors are purely visual so students can connect
+// phenotype to observable behavior.
 
 import * as THREE from "three";
 import { SceneManager } from "./SceneManager";
 import { SimState, CreatureJson } from "../state/SimState";
 import { computePhenotype } from "../utils/phenotype";
+import {
+  FishAgent,
+  FoodParticle,
+  DEFAULT_BEHAVIOR,
+  spawnFoodField,
+  stepBehavior,
+  buildFoodMesh,
+} from "./TankBehavior";
 
-const TANK_SIZE = { x: 8, y: 4, z: 4 };
+const FISH_SCALE = 0.22;
 
 export class PopulationTank {
   private boxHelper: THREE.LineSegments | null = null;
   private gradientHelper: THREE.Mesh | null = null;
   private instancedBody: THREE.InstancedMesh | null = null;
   private instancedTail: THREE.InstancedMesh | null = null;
+  private foodMesh: THREE.InstancedMesh | null = null;
   private population: CreatureJson[] = [];
-  private drifts: Array<{ cx: number; cy: number; cz: number; phase: number; speed: number; yaw: number }> = [];
+  private agents: FishAgent[] = [];
+  private food: FoodParticle[] = [];
   private archetype: any;
   private unsubs: Array<() => void> = [];
   private animUnsub: (() => void) | null = null;
   private visible = false;
+  private behaviorSpeedMultiplier = 1;
 
   constructor(private scene: SceneManager, private state: SimState, archetype: any) {
     this.archetype = archetype;
     this.buildTankEnvironment();
+    this.food = spawnFoodField(DEFAULT_BEHAVIOR);
     this.unsubs.push(state.onView.subscribe((v) => this.setVisible(v === "tank")));
     this.setVisible(state.view === "tank");
   }
 
+  /** Multiplier applied to intra-generation behavior tick rate.
+   *  Higher = fish appear to move faster. 1.0 = natural. */
+  setBehaviorSpeed(multiplier: number): void {
+    this.behaviorSpeedMultiplier = Math.max(0, multiplier);
+  }
+
   private buildTankEnvironment(): void {
-    const box = new THREE.BoxGeometry(TANK_SIZE.x, TANK_SIZE.y, TANK_SIZE.z);
+    const { tankSize } = DEFAULT_BEHAVIOR;
+    const box = new THREE.BoxGeometry(tankSize.x, tankSize.y, tankSize.z);
     const wireframe = new THREE.WireframeGeometry(box);
     const lines = new THREE.LineSegments(
       wireframe,
@@ -46,8 +61,7 @@ export class PopulationTank {
     this.boxHelper = lines;
     this.scene.scene.add(lines);
 
-    // Depth gradient: translucent plane that fades warm→cool top to bottom.
-    const planeGeom = new THREE.PlaneGeometry(TANK_SIZE.x, TANK_SIZE.y, 1, 32);
+    const planeGeom = new THREE.PlaneGeometry(tankSize.x, tankSize.y, 1, 32);
     const planeMat = new THREE.ShaderMaterial({
       transparent: true,
       uniforms: {},
@@ -61,7 +75,7 @@ export class PopulationTank {
       fragmentShader: `
         varying float vY;
         void main() {
-          float t = clamp((vY + ${(TANK_SIZE.y / 2).toFixed(1)}) / ${TANK_SIZE.y.toFixed(1)}, 0.0, 1.0);
+          float t = clamp((vY + ${(tankSize.y / 2).toFixed(1)}) / ${tankSize.y.toFixed(1)}, 0.0, 1.0);
           vec3 warm = vec3(0.25, 0.35, 0.5);
           vec3 cold = vec3(0.05, 0.08, 0.14);
           vec3 c = mix(cold, warm, t);
@@ -72,10 +86,16 @@ export class PopulationTank {
       side: THREE.DoubleSide,
     });
     const plane = new THREE.Mesh(planeGeom, planeMat);
-    plane.position.z = -TANK_SIZE.z / 2 - 0.01;
+    plane.position.z = -tankSize.z / 2 - 0.01;
     plane.visible = false;
     this.gradientHelper = plane;
     this.scene.scene.add(plane);
+
+    // Food mesh (instanced; one slot per food particle).
+    const foodMesh = buildFoodMesh(DEFAULT_BEHAVIOR.foodCount);
+    foodMesh.visible = false;
+    this.foodMesh = foodMesh;
+    this.scene.scene.add(foodMesh);
   }
 
   setPopulation(creatures: CreatureJson[]): void {
@@ -83,8 +103,10 @@ export class PopulationTank {
     const currentCapacity = this.instancedBody?.count ?? 0;
     if (creatures.length !== currentCapacity) {
       this.rebuildInstances();
+      this.rebuildAgents();
     } else {
       this.refreshInstanceAttrs();
+      this.refreshAgents();
     }
   }
 
@@ -109,7 +131,6 @@ export class PopulationTank {
     const bodyMat = new THREE.MeshStandardMaterial({
       roughness: 0.8,
       metalness: 0.05,
-      vertexColors: false,
     });
     const body = new THREE.InstancedMesh(bodyGeom, bodyMat, n);
     body.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
@@ -117,56 +138,9 @@ export class PopulationTank {
 
     const tailGeom = new THREE.ConeGeometry(0.4, 0.8, 6);
     tailGeom.rotateZ(Math.PI / 2);
-    const tailMat = new THREE.MeshStandardMaterial({
-      color: 0x3a4050,
-      roughness: 0.8,
-    });
+    const tailMat = new THREE.MeshStandardMaterial({ color: 0x3a4050, roughness: 0.8 });
     const tail = new THREE.InstancedMesh(tailGeom, tailMat, n);
     tail.visible = this.visible;
-
-    const tmp = new THREE.Object3D();
-    this.drifts = [];
-
-    for (let i = 0; i < n; i++) {
-      const c = this.population[i];
-      const ph = computePhenotype(c, this.archetype);
-      const hue = clamp(ph.body_color_hue ?? 0.5, 0, 1);
-      const size = clamp(ph.body_size ?? 1.0, 0.5, 2.0);
-      const streamlined = clamp(ph.body_shape_streamlined ?? 0.5, 0, 1);
-      const color = bodyColor(hue);
-      body.setColorAt(i, color);
-
-      const cx = (Math.random() - 0.5) * (TANK_SIZE.x - 1);
-      const cy = (Math.random() - 0.5) * (TANK_SIZE.y - 0.5);
-      const cz = (Math.random() - 0.5) * (TANK_SIZE.z - 0.5);
-      const yaw = Math.random() * Math.PI * 2;
-      this.drifts.push({
-        cx,
-        cy,
-        cz,
-        phase: Math.random() * Math.PI * 2,
-        speed: 0.15 + 0.15 * (ph.metabolic_rate ?? 0.5),
-        yaw,
-      });
-
-      const scale = 0.25 + 0.15 * size;
-      tmp.position.set(cx, cy, cz);
-      tmp.scale.set(scale * (1 + 0.2 * streamlined), scale, scale);
-      tmp.rotation.set(0, yaw, 0);
-      tmp.updateMatrix();
-      body.setMatrixAt(i, tmp.matrix);
-
-      // Tail placed slightly behind body.
-      tmp.position.x += -Math.cos(yaw) * scale * 1.5;
-      tmp.position.z += -Math.sin(yaw) * scale * 1.5;
-      tmp.scale.set(scale * 0.8, scale * 0.8, scale * 0.8);
-      tmp.updateMatrix();
-      tail.setMatrixAt(i, tmp.matrix);
-    }
-
-    body.instanceMatrix.needsUpdate = true;
-    body.instanceColor!.needsUpdate = true;
-    tail.instanceMatrix.needsUpdate = true;
 
     this.scene.scene.add(body);
     this.scene.scene.add(tail);
@@ -174,69 +148,108 @@ export class PopulationTank {
     this.instancedTail = tail;
 
     if (!this.animUnsub) {
-      this.animUnsub = this.scene.registerAnim((dt, t) => this.tick(dt, t));
+      this.animUnsub = this.scene.registerAnim((dt) => this.tick(dt));
     }
   }
 
-  /** Update per-instance color + drift state without reallocating the
-   *  InstancedMesh. Called when the population size didn't change. */
-  private refreshInstanceAttrs(): void {
-    if (!this.instancedBody) return;
-    const body = this.instancedBody;
-    const n = this.population.length;
-    this.drifts = [];
-    for (let i = 0; i < n; i++) {
+  private rebuildAgents(): void {
+    const { tankSize } = DEFAULT_BEHAVIOR;
+    this.agents = this.population.map((c) => {
+      const ph = computePhenotype(c, this.archetype);
+      const margin = FISH_SCALE * 2;
+      return {
+        x: (Math.random() - 0.5) * (tankSize.x - 2 * margin),
+        y: (Math.random() - 0.5) * (tankSize.y - 2 * margin),
+        z: (Math.random() - 0.5) * (tankSize.z - 2 * margin),
+        yaw: Math.random() * Math.PI * 2,
+        speed: 0.5 + 1.5 * (ph.metabolic_rate ?? 0.5),
+        displayIntensity: ph.mating_display_intensity ?? 0.3,
+        isMale: c.sex === "male",
+        targetFoodIdx: null,
+        courtshipPartnerIdx: null,
+        courtshipT: 0,
+        eatPulse: 0,
+        phase: Math.random() * Math.PI * 2,
+      } as FishAgent;
+    });
+    this.applyBodyColors();
+  }
+
+  /** New generation, same capacity: keep positions but update
+   *  phenotype-derived parameters and colors. */
+  private refreshAgents(): void {
+    for (let i = 0; i < this.population.length; i++) {
       const c = this.population[i];
       const ph = computePhenotype(c, this.archetype);
-      const hue = clamp(ph.body_color_hue ?? 0.5, 0, 1);
-      body.setColorAt(i, bodyColor(hue));
-      const cx = (Math.random() - 0.5) * (TANK_SIZE.x - 1);
-      const cy = (Math.random() - 0.5) * (TANK_SIZE.y - 0.5);
-      const cz = (Math.random() - 0.5) * (TANK_SIZE.z - 0.5);
-      const yaw = Math.random() * Math.PI * 2;
-      this.drifts.push({
-        cx,
-        cy,
-        cz,
-        phase: Math.random() * Math.PI * 2,
-        speed: 0.15 + 0.15 * (ph.metabolic_rate ?? 0.5),
-        yaw,
-      });
+      const a = this.agents[i];
+      if (!a) continue;
+      a.speed = 0.5 + 1.5 * (ph.metabolic_rate ?? 0.5);
+      a.displayIntensity = ph.mating_display_intensity ?? 0.3;
+      a.isMale = c.sex === "male";
     }
-    body.instanceColor!.needsUpdate = true;
+    this.applyBodyColors();
   }
 
-  private tick(_dt: number, t: number): void {
-    if (!this.instancedBody || !this.instancedTail) return;
-    const tmp = new THREE.Object3D();
-    for (let i = 0; i < this.drifts.length; i++) {
-      const d = this.drifts[i];
-      const ts = t * 0.001;
-      const x = d.cx + Math.sin(ts * d.speed + d.phase) * 0.8;
-      const y = d.cy + Math.sin(ts * d.speed * 0.5 + d.phase * 1.3) * 0.3;
-      const z = d.cz + Math.cos(ts * d.speed * 0.7 + d.phase) * 0.5;
-      const yaw = d.yaw + Math.sin(ts * d.speed + d.phase) * 0.4;
+  private refreshInstanceAttrs(): void {
+    this.applyBodyColors();
+  }
 
-      // Body
-      const size = 0.35;
-      tmp.position.set(x, y, z);
-      tmp.rotation.set(0, yaw, 0);
-      tmp.scale.setScalar(size);
+  private applyBodyColors(): void {
+    if (!this.instancedBody) return;
+    for (let i = 0; i < this.population.length; i++) {
+      const ph = computePhenotype(this.population[i], this.archetype);
+      const hue = clamp(ph.body_color_hue ?? 0.5, 0, 1);
+      this.instancedBody.setColorAt(i, bodyColor(hue));
+    }
+    this.instancedBody.instanceColor!.needsUpdate = true;
+  }
+
+  private tick(dt: number): void {
+    if (!this.visible) return;
+    if (!this.instancedBody || !this.instancedTail) return;
+    if (this.agents.length === 0) return;
+
+    const scaledDt = Math.min(0.1, dt * this.behaviorSpeedMultiplier);
+    stepBehavior(this.agents, this.food, DEFAULT_BEHAVIOR, scaledDt);
+
+    const tmp = new THREE.Object3D();
+    for (let i = 0; i < this.agents.length; i++) {
+      const a = this.agents[i];
+      const c = this.population[i];
+      const ph = c ? computePhenotype(c, this.archetype) : {};
+      const sizeScale = FISH_SCALE * clamp(ph.body_size ?? 1.0, 0.6, 1.6);
+      const pulse = 1 + a.eatPulse * 0.25;
+      tmp.position.set(a.x, a.y, a.z);
+      tmp.rotation.set(0, a.yaw, 0);
+      tmp.scale.setScalar(sizeScale * pulse);
       tmp.updateMatrix();
       this.instancedBody.setMatrixAt(i, tmp.matrix);
 
-      // Tail behind body
       tmp.position.set(
-        x - Math.cos(yaw) * size * 1.7,
-        y,
-        z - Math.sin(yaw) * size * 1.7
+        a.x - Math.sin(a.yaw) * sizeScale * 1.7,
+        a.y,
+        a.z - Math.cos(a.yaw) * sizeScale * 1.7
       );
-      tmp.scale.setScalar(size * 0.7);
+      tmp.scale.setScalar(sizeScale * 0.7);
       tmp.updateMatrix();
       this.instancedTail.setMatrixAt(i, tmp.matrix);
     }
     this.instancedBody.instanceMatrix.needsUpdate = true;
     this.instancedTail.instanceMatrix.needsUpdate = true;
+
+    if (this.foodMesh) {
+      const fTmp = new THREE.Object3D();
+      for (let fi = 0; fi < this.food.length; fi++) {
+        const f = this.food[fi];
+        const active = f.respawnIn <= 0;
+        const vis = active ? 1.0 : 0.0;
+        fTmp.position.set(f.x, f.y, f.z);
+        fTmp.scale.setScalar(vis);
+        fTmp.updateMatrix();
+        this.foodMesh.setMatrixAt(fi, fTmp.matrix);
+      }
+      this.foodMesh.instanceMatrix.needsUpdate = true;
+    }
   }
 
   private setVisible(v: boolean): void {
@@ -245,12 +258,12 @@ export class PopulationTank {
     if (this.gradientHelper) this.gradientHelper.visible = v;
     if (this.instancedBody) this.instancedBody.visible = v;
     if (this.instancedTail) this.instancedTail.visible = v;
+    if (this.foodMesh) this.foodMesh.visible = v;
     if (v) {
-      // Fit camera to tank.
-      this.scene.camera.position.set(0, 2, TANK_SIZE.x * 1.4);
+      const { tankSize } = DEFAULT_BEHAVIOR;
+      this.scene.camera.position.set(0, tankSize.y * 0.25, tankSize.x * 1.3);
       this.scene.camera.lookAt(0, 0, 0);
     } else {
-      // Return to organism-view framing.
       this.scene.camera.position.set(0, 1.2, 4.5);
       this.scene.camera.lookAt(0, 0, 0);
     }
@@ -263,6 +276,7 @@ export class PopulationTank {
     if (this.gradientHelper) this.scene.scene.remove(this.gradientHelper);
     if (this.instancedBody) this.scene.scene.remove(this.instancedBody);
     if (this.instancedTail) this.scene.scene.remove(this.instancedTail);
+    if (this.foodMesh) this.scene.scene.remove(this.foodMesh);
   }
 }
 

@@ -23,7 +23,15 @@ export class OrganismRenderer {
     this.unsubs.push(
       state.onHoverLocus.subscribe((loc) => this.applyHover(loc))
     );
+    this.unsubs.push(
+      state.onView.subscribe((v) => this.setVisible(v === "organism"))
+    );
     this.rebuild(state.selected);
+    this.setVisible(state.view === "organism");
+  }
+
+  private setVisible(v: boolean): void {
+    if (this.currentMesh) this.currentMesh.visible = v;
   }
 
   private rebuild(c: CreatureJson | null): void {
@@ -42,6 +50,7 @@ export class OrganismRenderer {
     const isMale = c.sex === "male";
     const mesh = buildFishMesh(ph, isMale);
     mesh.position.y = 0;
+    mesh.visible = this.state.view === "organism";
 
     // Idle gentle bob.
     this.unsubAnim = this.scene.registerAnim((_dt, t) => {
